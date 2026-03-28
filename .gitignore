@@ -1,0 +1,19 @@
+# Node
+node_modules/
+
+# Env
+.env
+
+# Sessions (VERY IMPORTANT)
+sessions/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build / temp
+dist/
+tmp/

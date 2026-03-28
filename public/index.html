@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WhatsApp Dashboard</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 15px;
+    }
+
+    input, button {
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      margin-top: 5px;
+      width: 100%;
+    }
+
+    button {
+      background: #22c55e;
+      color: white;
+      cursor: pointer;
+    }
+
+    .client {
+      background: #334155;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+
+    img {
+      width: 200px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- LOGIN -->
+  <div id="loginCard" class="card">
+    <h2>Enter API Key</h2>
+    <input id="keyInput" placeholder="API Key" />
+    <button onclick="login()">Access</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" style="display:none">
+
+    <div class="card">
+      <h2>Create Client</h2>
+      <input id="newClientId" placeholder="Client ID" />
+      <button onclick="createClient()">Create</button>
+    </div>
+
+    <div id="clients"></div>
+
+  </div>
+
+</div>
+
+<script>
+let API_KEY = "";
+let qrIntervals = {};
+
+function login() {
+  API_KEY = document.getElementById("keyInput").value;
+
+  document.getElementById("loginCard").style.display = "none";
+  document.getElementById("dashboard").style.display = "block";
+
+  loadClients();
+}
+
+async function loadClients() {
+  const res = await fetch(`/clients?key=${API_KEY}`);
+  const data = await res.json();
+
+  const container = document.getElementById("clients");
+  container.innerHTML = "";
+
+  data.forEach(c => {
+    container.innerHTML += `
+      <div class="client">
+        <b>${c.clientId}</b><br/>
+        Status: <span id="status_${c.clientId}">${c.status}</span><br/>
+
+        <input id="wh_${c.clientId}" placeholder="Webhook URL" value="${c.webhook}" />
+
+        <button onclick="updateWebhook('${c.clientId}')">Save Webhook</button>
+
+        ${
+          c.status === "connected"
+          ? "<button disabled>Logged In ✅</button>"
+          : `<button onclick="startQR('${c.clientId}')">Get QR</button>`
+        }
+
+        <div id="qr_${c.clientId}"></div>
+      </div>
+    `;
+  });
+}
+
+function startQR(clientId) {
+
+  if (qrIntervals[clientId]) return;
+
+  qrIntervals[clientId] = setInterval(async () => {
+
+    try {
+      const res = await fetch(`/qr/${clientId}?key=${API_KEY}`);
+      const data = await res.json();
+
+      if (data.qr) {
+        document.getElementById(`qr_${clientId}`).innerHTML =
+          `<img src="${data.qr}" />`;
+      } else {
+        document.getElementById(`qr_${clientId}`).innerHTML =
+          `<p>✅ Logged In</p>`;
+
+        document.getElementById(`status_${clientId}`).innerText = "connected";
+
+        clearInterval(qrIntervals[clientId]);
+      }
+
+    } catch (err) {
+      console.log("QR error");
+    }
+
+  }, 2000);
+}
+
+async function createClient() {
+  const id = document.getElementById("newClientId").value;
+
+  await fetch(`/start?key=${API_KEY}`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ clientId: id })
+  });
+
+  loadClients();
+}
+
+async function updateWebhook(id) {
+  const webhook = document.getElementById("wh_" + id).value;
+
+  await fetch(`/webhook?key=${API_KEY}`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ clientId: id, webhook })
+  });
+
+  alert("Webhook saved");
+}
+</script>
+
+</body>
+</html>
