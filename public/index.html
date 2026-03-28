@@ -1,80 +1,195 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>WhatsApp Dashboard</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Multi-Device Dashboard</title>
   <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
     body {
-      font-family: Arial;
-      background: #0f172a;
-      color: white;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       margin: 0;
       padding: 20px;
+      line-height: 1.5;
     }
 
     .container {
-      max-width: 900px;
-      margin: auto;
+      max-width: 1000px;
+      margin: 40px auto;
     }
+
+    h1, h2 { margin-bottom: 20px; font-weight: 700; }
 
     .card {
-      background: #1e293b;
-      padding: 20px;
-      border-radius: 12px;
-      margin-bottom: 15px;
+      background: var(--card-bg);
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      border: 1px solid #334155;
     }
 
-    input, button {
-      padding: 10px;
+    /* Input & Button Styling */
+    input {
+      background: #0f172a;
+      border: 1px solid #334155;
+      padding: 12px 16px;
       border-radius: 8px;
-      border: none;
-      margin-top: 5px;
+      color: white;
       width: 100%;
+      box-sizing: border-box;
+      margin-bottom: 12px;
+      transition: border 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--accent);
     }
 
     button {
-      background: #22c55e;
+      background: var(--accent);
       color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 600;
       cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
 
-    .client {
-      background: #334155;
-      padding: 15px;
-      border-radius: 10px;
-      margin-top: 10px;
+    button:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    button:disabled { background: #334155; cursor: not-allowed; transform: none; }
+    
+    .btn-secondary { background: #475569; }
+    .btn-secondary:hover { background: #334155; }
+
+    /* Client List */
+    .client-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
     }
 
-    img {
-      width: 200px;
-      margin-top: 10px;
+    .client-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #334155;
+      position: relative;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .status-connected { background: #064e3b; color: #34d399; }
+    .status-qr { background: #451a03; color: #fbbf24; }
+    .status-disconnected { background: #450a0a; color: #f87171; }
+    .status-idle { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+
+    .client-id { font-size: 1.2rem; display: block; margin-bottom: 15px; }
+
+    .qr-container {
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      margin-top: 15px;
+      text-align: center;
+    }
+
+    .qr-container img { width: 100%; max-width: 200px; }
+
+    /* Logs Modal */
+    #logOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+    .log-content {
+      background: var(--card-bg);
+      width: 90%;
+      max-width: 600px;
+      height: 70vh;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .log-body {
+      flex: 1;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 13px;
+      background: #0f172a;
+      padding: 10px;
+      border-radius: 8px;
     }
   </style>
 </head>
-
 <body>
 
 <div class="container">
-
-  <!-- LOGIN -->
-  <div id="loginCard" class="card">
-    <h2>Enter API Key</h2>
-    <input id="keyInput" placeholder="API Key" />
-    <button onclick="login()">Access</button>
+  <!-- AUTH SECTION -->
+  <div id="loginCard" class="card" style="max-width: 400px; margin: 100px auto;">
+    <h2 style="text-align: center;">Admin Access</h2>
+    <input type="password" id="keyInput" placeholder="Enter API Key..." />
+    <button onclick="login()" style="width: 100%;">Unlock Dashboard</button>
   </div>
 
-  <!-- DASHBOARD -->
+  <!-- DASHBOARD SECTION -->
   <div id="dashboard" style="display:none">
-
-    <div class="card">
-      <h2>Create Client</h2>
-      <input id="newClientId" placeholder="Client ID" />
-      <button onclick="createClient()">Create</button>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1>WhatsApp Manager</h1>
+      <button class="btn-secondary" onclick="loadClients()">🔄 Refresh List</button>
     </div>
 
-    <div id="clients"></div>
+    <div class="card">
+      <h3>Add New Connection</h3>
+      <div style="display: flex; gap: 10px;">
+        <input id="newClientId" placeholder="e.g. Sales_Bot_1" style="margin: 0; flex: 1;" />
+        <button onclick="createClient()">Create Client</button>
+      </div>
+    </div>
 
+    <div id="clients" class="client-grid"></div>
   </div>
+</div>
 
+<!-- LOG OVERLAY -->
+<div id="logOverlay">
+  <div class="log-content">
+    <h3>Message History</h3>
+    <div id="logBody" class="log-body"></div>
+    <button onclick="closeLogs()" style="margin-top: 15px;" class="btn-secondary">Close</button>
+  </div>
 </div>
 
 <script>
@@ -83,93 +198,114 @@ let qrIntervals = {};
 
 function login() {
   API_KEY = document.getElementById("keyInput").value;
-
+  if(!API_KEY) return alert("Key required");
+  
   document.getElementById("loginCard").style.display = "none";
   document.getElementById("dashboard").style.display = "block";
-
   loadClients();
 }
 
 async function loadClients() {
-  const res = await fetch(`/clients?key=${API_KEY}`);
-  const data = await res.json();
+  try {
+    const res = await fetch(`/clients?key=${API_KEY}`);
+    const data = await res.json();
+    const container = document.getElementById("clients");
+    container.innerHTML = "";
 
-  const container = document.getElementById("clients");
-  container.innerHTML = "";
+    data.forEach(c => {
+      const statusClass = `status-${c.status === 'connected' ? 'connected' : c.status === 'qr' ? 'qr' : 'idle'}`;
+      
+      container.innerHTML += `
+        <div class="client-card">
+          <span class="status-badge ${statusClass}">${c.status}</span>
+          <strong class="client-id">${c.clientId}</strong>
+          
+          <label style="font-size: 12px; color: var(--text-muted)">Webhook Endpoint</label>
+          <input id="wh_${c.clientId}" value="${c.webhook}" style="font-size: 13px; margin-bottom: 8px;" />
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button onclick="updateWebhook('${c.clientId}')" class="btn-secondary" style="padding: 8px;">Save URL</button>
+            <button onclick="viewLogs('${c.clientId}')" class="btn-secondary" style="padding: 8px;">View Logs</button>
+          </div>
 
-  data.forEach(c => {
-    container.innerHTML += `
-      <div class="client">
-        <b>${c.clientId}</b><br/>
-        Status: <span id="status_${c.clientId}">${c.status}</span><br/>
+          <div style="margin-top: 10px;">
+            ${c.status === 'connected' 
+              ? `<button disabled style="width: 100%; background: #064e3b;">Active ✅</button>` 
+              : `<button onclick="startQR('${c.clientId}')" style="width: 100%;">Generate QR</button>`
+            }
+          </div>
 
-        <input id="wh_${c.clientId}" placeholder="Webhook URL" value="${c.webhook}" />
-
-        <button onclick="updateWebhook('${c.clientId}')">Save Webhook</button>
-
-        ${
-          c.status === "connected"
-          ? "<button disabled>Logged In ✅</button>"
-          : `<button onclick="startQR('${c.clientId}')">Get QR</button>`
-        }
-
-        <div id="qr_${c.clientId}"></div>
-      </div>
-    `;
-  });
+          <div id="qr_box_${c.clientId}" class="qr-container" style="display: none;"></div>
+        </div>
+      `;
+    });
+  } catch (e) {
+    alert("Connection error. Check API Key.");
+  }
 }
 
 function startQR(clientId) {
+  const box = document.getElementById(`qr_box_${clientId}`);
+  box.style.display = "block";
+  box.innerHTML = "Initializing...";
 
-  if (qrIntervals[clientId]) return;
+  if (qrIntervals[clientId]) clearInterval(qrIntervals[clientId]);
 
   qrIntervals[clientId] = setInterval(async () => {
+    const res = await fetch(`/qr/${clientId}?key=${API_KEY}`);
+    const data = await res.json();
 
-    try {
-      const res = await fetch(`/qr/${clientId}?key=${API_KEY}`);
-      const data = await res.json();
-
-      if (data.qr) {
-        document.getElementById(`qr_${clientId}`).innerHTML =
-          `<img src="${data.qr}" />`;
-      } else {
-        document.getElementById(`qr_${clientId}`).innerHTML =
-          `<p>✅ Logged In</p>`;
-
-        document.getElementById(`status_${clientId}`).innerText = "connected";
-
-        clearInterval(qrIntervals[clientId]);
-      }
-
-    } catch (err) {
-      console.log("QR error");
+    if (data.qr) {
+      box.innerHTML = `<img src="${data.qr}" /><p style="color: black; font-size: 12px; margin:0;">Scan with WhatsApp</p>`;
+    } else if (data.status === "connected") {
+      box.innerHTML = "✅ Connected!";
+      clearInterval(qrIntervals[clientId]);
+      setTimeout(loadClients, 2000);
     }
-
-  }, 2000);
+  }, 3000);
 }
 
 async function createClient() {
   const id = document.getElementById("newClientId").value;
-
+  if(!id) return;
   await fetch(`/start?key=${API_KEY}`, {
     method: "POST",
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ clientId: id })
   });
-
   loadClients();
 }
 
 async function updateWebhook(id) {
   const webhook = document.getElementById("wh_" + id).value;
-
   await fetch(`/webhook?key=${API_KEY}`, {
     method: "POST",
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ clientId: id, webhook })
   });
+  alert("Webhook updated!");
+}
 
-  alert("Webhook saved");
+async function viewLogs(id) {
+  const overlay = document.getElementById("logOverlay");
+  const body = document.getElementById("logBody");
+  overlay.style.display = "flex";
+  body.innerHTML = "Loading logs...";
+
+  const res = await fetch(`/logs/${id}?key=${API_KEY}`);
+  const data = await res.json();
+  
+  body.innerHTML = data.history.map(l => `
+    <div style="border-bottom: 1px solid #334155; padding: 5px 0;">
+      <small style="color: var(--accent)">[${l.timestamp}]</small> 
+      <b style="color: ${l.direction === 'OUTGOING' ? '#36d1ff' : '#10b981'}">${l.direction}</b><br/>
+      ${l.message}
+    </div>
+  `).join("") || "No messages found.";
+}
+
+function closeLogs() {
+  document.getElementById("logOverlay").style.display = "none";
 }
 </script>
 
