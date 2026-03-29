@@ -256,6 +256,74 @@ app.post("/send", auth, async (req, res) => {
 });
 
 
+app.post("/send-media", auth, async (req, res) => {
+    const { clientId, to, type, imageUrl, images, caption } = req.body;
+
+    if (!clientId || !to || !type) {
+        return res.status(400).json({ error: "clientId, to, type required" });
+    }
+
+    const sock = clients[clientId];
+
+    if (!sock) {
+        return res.status(400).json({ error: "Client not connected" });
+    }
+
+    try {
+        // Convert to JID if number
+        let jid = to;
+        if (!to.includes("@")) {
+            jid = to + "@s.whatsapp.net";
+        }
+
+        // ✅ SINGLE IMAGE
+        if (type === "image") {
+            if (!imageUrl) {
+                return res.status(400).json({ error: "imageUrl required" });
+            }
+
+            await sock.sendMessage(jid, {
+                image: { url: imageUrl },
+                caption: caption || ""
+            });
+        }
+
+        // ✅ MULTIPLE IMAGES
+        else if (type === "images") {
+            if (!images || !Array.isArray(images)) {
+                return res.status(400).json({ error: "images array required" });
+            }
+
+            for (let i = 0; i < images.length; i++) {
+                const img = images[i];
+
+                await sock.sendMessage(jid, {
+                    image: { url: img.url },
+                    caption: `📸 ${i + 1}/${images.length}\n${img.caption || ""}`
+                });
+
+                // small delay
+                await new Promise(r => setTimeout(r, 500));
+            }
+        }
+
+        else {
+            return res.status(400).json({ error: "Invalid type" });
+        }
+
+        res.json({
+            success: true,
+            to: jid,
+            type
+        });
+
+    } catch (err) {
+        console.error(`❌ Media Send Error [${clientId}]`, err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 /* =========================
    SERVER START
 ========================= */
