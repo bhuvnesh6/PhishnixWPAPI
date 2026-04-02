@@ -99,58 +99,74 @@ async function startClient(clientId) {
 
     sock.ev.on("creds.update", saveCreds);
 
-    /* 📩 MESSAGE & LOG HANDLER */
-    /* 📩 MESSAGE & LOG HANDLER */
-sock.ev.on("messages.upsert", async ({ messages, type }) => {
-    if (type !== 'notify') return;
+   
+/* 📩 MESSAGE & LOG HANDLER */
+    sock.ev.on("messages.upsert", async ({ messages, type }) => {
+        if (type !== 'notify') return;
 
-    const msg = messages[0];
-    if (!msg.message) return;
+        const msg = messages[0];
+        if (!msg.message) return;
 
-    // 1. Get the Raw ID
-    const rawJid = msg.key.remoteJid;
-    
-    // 2. Extract the Phone Number (Cleans @s.whatsapp.net or @lid)
-    // This regex takes the numbers before the '@' sign
-    const phoneNumber = rawJid.split('@')[0].split(':')[0]; 
+        const rawJid = msg.key.remoteJid;
 
-    const isMe = msg.key.fromMe;
-    const pushName = msg.pushName || (isMe ? "Me" : "Customer");
-    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || "Non-text message";
-
-    // 3. Prepare the Log Entry
-    const logEntry = {
-        timestamp: new Date().toLocaleString(),
-        direction: isMe ? "OUTGOING" : "INCOMING",
-        from: rawJid,       // Keep full JID for system use
-        phone: phoneNumber, // Clean phone number for your HTTP requests
-        sender: pushName,
-        message: text
-    };
-
-    // Console Logging for debugging
-    const color = isMe ? "\x1b[36m" : "\x1b[32m"; 
-    console.log(`${color}[${logEntry.direction}] ${clientId} | Phone: ${phoneNumber} | ${pushName}: ${text}\x1b[0m`);
-
-    // 4. Trigger Webhook with the "phone" field
-    const webhook = webhookStore[clientId];
-    if (webhook) {
-        try {
-            await axios.post(webhook, {
-                clientId,
-                from: rawJid,
-                phone: phoneNumber, // 👈 Now you have the number for your n8n/HTTP requests
-                pushName,
-                message: text,
-                isMe: isMe,
-                direction: logEntry.direction,
-                timestamp: logEntry.timestamp
-            });
-        } catch (err) {
-            console.error(`⚠️ [${clientId}] Webhook Error:`, err.message);
+        // 🚫 1. BLOCK GROUPS & BROADCASTS
+        // This stops the bot from processing or replying to any group messages
+        if (rawJid.endsWith('@g.us') || rawJid.endsWith('@broadcast')) {
+            return; 
         }
-    }
-});
+
+        // 📱 2. NORMALIZE ID (Convert LID to standard User Number)
+        // Strips :1, :2 etc and forces @s.whatsapp.net
+        const pureNumber = rawJid.split('@')[0].split(':')[0]; 
+        const normalizedUserJid = `${pureNumber}@s.whatsapp.net`;
+
+        const isMe = msg.key.fromMe;
+        const pushName = msg.pushName || (isMe ? "Me" : "Customer");
+        
+        // Handle different message types (Text, Extended Text, etc.)
+        const text = msg.message.conversation || 
+                     msg.message.extendedTextMessage?.text || 
+                     (msg.message.imageMessage ? "Sent an image" : "Non-text message");
+
+        // 📝 3. Prepare Log Entry
+        const logEntry = {
+            timestamp: new Date().toLocaleString(),
+            direction: isMe ? "OUTGOING" : "INCOMING",
+            chatPartner: normalizedUserJid, // This is always the Customer's ID
+            phone: pureNumber,              // Just the digits
+            sender: pushName,
+            message: text
+        };
+
+        // Console Logging (Invisible to user, helpful for you)
+        const color = isMe ? "\x1b[36m" : "\x1b[32m"; 
+        console.log(`${color}[${logEntry.direction}] ${clientId} | Customer: ${pureNumber} | ${pushName}: ${text}\x1b[0m`);
+
+        // Save to in-memory logs
+        if (!messageLogs[clientId]) messageLogs[clientId] = [];
+        messageLogs[clientId].push(logEntry);
+        if (messageLogs[clientId].length > 50) messageLogs[clientId].shift();
+
+        // 🪝 4. Trigger Webhook
+        const webhook = webhookStore[clientId];
+        if (webhook) {
+            try {
+                await axios.post(webhook, {
+                    clientId,
+                    from: isMe ? "Me" : normalizedUserJid,
+                    to: isMe ? normalizedUserJid : "Me",
+                    phone: pureNumber, // 👈 Clean number for your CRM/n8n
+                    pushName,
+                    message: text,
+                    isMe: isMe,
+                    direction: logEntry.direction,
+                    timestamp: logEntry.timestamp
+                });
+            } catch (err) {
+                console.error(`⚠️ [${clientId}] Webhook Error:`, err.message);
+            }
+        }
+    });
 }
 
 /* =========================
